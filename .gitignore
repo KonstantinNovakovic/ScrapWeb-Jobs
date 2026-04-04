@@ -1,0 +1,11 @@
+config.json
+seen_jobs.json
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+.vscode/
+.idea/
+.DS_Store

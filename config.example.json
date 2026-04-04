@@ -1,0 +1,7 @@
+{
+  "keywords": ["customer support", "QA", "junior frontend", "tester", "help desk", "english"],
+  "location": "Beograd",
+  "sites": ["infostud"],
+  "telegram_token": "YOUR_BOT_TOKEN_HERE",
+  "chat_id": "YOUR_CHAT_ID_HERE"
+}
