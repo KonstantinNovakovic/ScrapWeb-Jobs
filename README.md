@@ -7,7 +7,7 @@ Runs well as a local cron task every 4 hours on Kubuntu/Linux.
 ## Features
 
 - Scrapes Infostud jobs (with a "RSS-first, HTML-fallback" strategy)
-- Case-insensitive filtering by keywords and location
+- Case-insensitive filtering by include/exclude keywords and location
 - Deduplication using `seen_jobs.json`
 - Telegram notifications for new jobs only
 - Silent if no new matching jobs
@@ -52,6 +52,7 @@ Edit `config.json`:
 ```json
 {
   "keywords": ["customer support", "QA", "junior frontend", "tester", "help desk", "english"],
+  "exclude_keywords": ["senior", "internship"],
   "location": "Beograd",
   "sites": ["infostud"],
   "telegram_token": "YOUR_BOT_TOKEN_HERE",
@@ -81,7 +82,7 @@ Option B: add bot to a group, send a message, and read group chat id from `getUp
 ## 4) Run manually
 
 ```bash
-python3 main.py
+./run.sh
 ```
 
 Pipeline:
@@ -104,7 +105,7 @@ crontab -e
 Example line (every 4 hours):
 
 ```cron
-0 */4 * * * cd /path/to/ScrapWeb-Jobs && /path/to/ScrapWeb-Jobs/.venv/bin/python main.py >> /path/to/ScrapWeb-Jobs/cron.log 2>&1
+0 */4 * * * /home/kosta/repos/ScrapWeb-Jobs/run.sh >> /home/kosta/repos/ScrapWeb-Jobs/cron.log 2>&1
 ```
 
 ## Notes on scraping reliability

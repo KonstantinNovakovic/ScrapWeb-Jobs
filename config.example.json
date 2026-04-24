@@ -1,7 +1,16 @@
 {
-  "keywords": ["customer support", "QA", "junior frontend", "tester", "help desk", "english"],
-  "location": "Beograd",
-  "sites": ["infostud"],
-  "telegram_token": "YOUR_BOT_TOKEN_HERE",
-  "chat_id": "YOUR_CHAT_ID_HERE"
+  "keywords": [
+    "customer support",
+    "QA",
+    "junior frontend",
+    "tester",
+    "help desk",
+    "english"
+  ],
+  "exclude_keywords": ["senior", "internship"],
+  "location": ["Beograd", "Remote", "Rad od kuće"],
+  "sites": ["infostud", "helloworld", "jooble", "jobicy"],
+  "jooble_api_key": "YOUR_JOOBLE_API_KEY_HERE",
+  "telegram_token": "blabla",
+  "chat_id": "371377269"
 }

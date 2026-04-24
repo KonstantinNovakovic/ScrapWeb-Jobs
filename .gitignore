@@ -9,3 +9,6 @@ venv/
 .vscode/
 .idea/
 .DS_Store
+.codex/
+cron.log
+repomix-output.xml
