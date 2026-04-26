@@ -6,12 +6,32 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urlencode, urljoin, urlparse, urlunparse
 
 import requests
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
+
+
+def _canonical_link(url: str) -> str:
+    """Strip query string, fragment, and trailing slashes from a URL.
+
+    Job identity for these boards lives in the path. Query strings only carry
+    search context and tracking fields, so keeping them breaks dedup.
+    """
+    parts = urlparse(url.strip())
+    path = parts.path.rstrip('/')
+    return urlunparse(
+        (
+            parts.scheme.lower(),
+            parts.netloc.lower(),
+            path,
+            '',
+            '',
+            '',
+        )
+    )
 
 
 @dataclass
@@ -120,7 +140,7 @@ class BaseScraper:
                         title=title,
                         company=company,
                         location=location,
-                        link=urljoin(self.base_url, link),
+                        link=_canonical_link(urljoin(self.base_url, link)),
                         date_posted=date_posted,
                     )
                 )
@@ -135,10 +155,12 @@ class InfostudScraper(BaseScraper):
     def scrape(self) -> list[JobListing]:
         jobs_by_link: dict[str, JobListing] = {}
         search_urls = self._search_urls()
+        total_raw = 0
 
         for index, search_url in enumerate(search_urls):
             try:
                 site_jobs = self._scrape_html(search_url)
+                total_raw += len(site_jobs)
                 for job in site_jobs:
                     jobs_by_link[job.link] = job
             except ScraperError as exc:
@@ -147,6 +169,13 @@ class InfostudScraper(BaseScraper):
             if index < len(search_urls) - 1:
                 time.sleep(self.delay_seconds)
 
+        logger.info(
+            '%s: %d raw results across %d searches, %d unique after canonicalization',
+            self.site_name,
+            total_raw,
+            len(search_urls),
+            len(jobs_by_link),
+        )
         return list(jobs_by_link.values())
 
     def _search_urls(self) -> list[str]:
@@ -205,7 +234,7 @@ class InfostudScraper(BaseScraper):
                     title=title,
                     company='Nepoznato',
                     location='Nepoznato',
-                    link=link,
+                    link=_canonical_link(link),
                     date_posted=date_posted,
                 )
             )
@@ -250,7 +279,7 @@ class InfostudScraper(BaseScraper):
             title=title,
             company=company_el.get_text(' ', strip=True) if company_el else 'Nepoznato',
             location=location_el.get_text(' ', strip=True) if location_el else 'Nepoznato',
-            link=urljoin(self.base_url, href),
+            link=_canonical_link(urljoin(self.base_url, href)),
             date_posted=date_el.get_text(' ', strip=True) if date_el else datetime.utcnow().isoformat(),
         )
 
@@ -263,6 +292,7 @@ class HelloWorldScraper(BaseScraper):
     def scrape(self) -> list[JobListing]:
         jobs_by_link: dict[str, JobListing] = {}
         search_urls = self._search_urls()
+        total_raw = 0
 
         for index, search_url in enumerate(search_urls):
             try:
@@ -270,6 +300,7 @@ class HelloWorldScraper(BaseScraper):
                 site_jobs = self._scrape_html(soup)
                 if not site_jobs:
                     site_jobs = self._parse_json_ld(soup)
+                total_raw += len(site_jobs)
                 for job in site_jobs:
                     jobs_by_link[job.link] = job
             except ScraperError as exc:
@@ -278,6 +309,13 @@ class HelloWorldScraper(BaseScraper):
             if index < len(search_urls) - 1:
                 time.sleep(self.delay_seconds)
 
+        logger.info(
+            '%s: %d raw results across %d searches, %d unique after canonicalization',
+            self.site_name,
+            total_raw,
+            len(search_urls),
+            len(jobs_by_link),
+        )
         if not jobs_by_link:
             logger.warning('HelloWorld returned no parseable job listings.')
         return list(jobs_by_link.values())
@@ -321,7 +359,7 @@ class HelloWorldScraper(BaseScraper):
             title=title,
             company=company_el.get_text(' ', strip=True) if company_el else 'Nepoznato',
             location=location_el or 'Nepoznato',
-            link=urljoin(self.base_url, href),
+            link=_canonical_link(urljoin(self.base_url, href)),
             date_posted=date_el or datetime.utcnow().isoformat(),
         )
 
@@ -350,10 +388,13 @@ class JoobleScraper(BaseScraper):
 
         jobs_by_link: dict[str, JobListing] = {}
         keywords = self.keywords or ['']
+        total_raw = 0
 
         for index, keyword in enumerate(keywords):
             try:
-                for job in self._fetch_keyword_jobs(keyword):
+                site_jobs = self._fetch_keyword_jobs(keyword)
+                total_raw += len(site_jobs)
+                for job in site_jobs:
                     jobs_by_link[job.link] = job
             except ScraperError as exc:
                 logger.warning('Jooble API request failed for %r: %s', keyword, exc)
@@ -361,6 +402,13 @@ class JoobleScraper(BaseScraper):
             if index < len(keywords) - 1:
                 time.sleep(1.0)
 
+        logger.info(
+            '%s: %d raw results across %d searches, %d unique after canonicalization',
+            self.site_name,
+            total_raw,
+            len(keywords),
+            len(jobs_by_link),
+        )
         return list(jobs_by_link.values())
 
     def _fetch_keyword_jobs(self, keyword: str) -> list[JobListing]:
@@ -394,7 +442,7 @@ class JoobleScraper(BaseScraper):
                     title=title,
                     company=str(item.get('company', '')).strip() or 'Nepoznato',
                     location=str(item.get('location', '')).strip() or 'Nepoznato',
-                    link=link,
+                    link=_canonical_link(link),
                     date_posted=str(item.get('updated', '')).strip() or datetime.utcnow().isoformat(),
                 )
             )
@@ -409,10 +457,13 @@ class JobicyScraper(BaseScraper):
     def scrape(self) -> list[JobListing]:
         jobs_by_link: dict[str, JobListing] = {}
         keywords = self.keywords or ['']
+        total_raw = 0
 
         for index, keyword in enumerate(keywords):
             try:
-                for job in self._fetch_keyword_jobs(keyword):
+                site_jobs = self._fetch_keyword_jobs(keyword)
+                total_raw += len(site_jobs)
+                for job in site_jobs:
                     jobs_by_link[job.link] = job
             except ScraperError as exc:
                 logger.warning('Jobicy API request failed for %r: %s', keyword, exc)
@@ -420,6 +471,13 @@ class JobicyScraper(BaseScraper):
             if index < len(keywords) - 1:
                 time.sleep(5.0)
 
+        logger.info(
+            '%s: %d raw results across %d searches, %d unique after canonicalization',
+            self.site_name,
+            total_raw,
+            len(keywords),
+            len(jobs_by_link),
+        )
         return list(jobs_by_link.values())
 
     def _fetch_keyword_jobs(self, keyword: str) -> list[JobListing]:
@@ -445,7 +503,7 @@ class JobicyScraper(BaseScraper):
                     title=title,
                     company=str(item.get('companyName', '')).strip() or 'Nepoznato',
                     location=str(item.get('jobGeo', '')).strip() or 'Remote',
-                    link=link,
+                    link=_canonical_link(link),
                     date_posted=str(item.get('pubDate', '')).strip() or datetime.utcnow().isoformat(),
                 )
             )
@@ -474,6 +532,13 @@ class JobertyScraper(BaseScraper):
         try:
             soup = self._fetch_search_page()
             jobs = self._parse_json_ld(soup)
+            logger.info(
+                '%s: %d raw results across %d searches, %d unique after canonicalization',
+                self.site_name,
+                len(jobs),
+                1,
+                len({job.link for job in jobs}),
+            )
             if not jobs:
                 logger.warning('Joberty returned a client-rendered page with no parseable job listings.')
             return jobs
